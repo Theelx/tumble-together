@@ -43,6 +43,8 @@
   let marbleElement;
   let reset = false;
   let triggerLock = false;
+  let alternateMode = false;
+  let alternateNextSide = 'left';
 
   function triggerLever(side='left') {
     if (!$board.marble && $marbles[side].length) {
@@ -63,7 +65,16 @@
           // Adds the marble to the results and atempts to launch another one from the coresponding side.
           $marbles.results.push(result.marble);
           $board = $board;
-          triggerLever(result.side);
+          if (alternateMode) {
+            alternateNextSide = result.side === 'left' ? 'right' : 'left';
+            if ($marbles[alternateNextSide].length) {
+              triggerLever(alternateNextSide);
+            } else {
+              alternateMode = false;
+            }
+          } else {
+            triggerLever(result.side);
+          }
           $marbles = $marbles;
         }
       }).catch(() => {
@@ -99,18 +110,27 @@
   }
 
   function triggerLeft() {
+    alternateMode = false;
     if ($socket) $socket.emit('run', 'left');
     triggerLever('left');
   }
 
   function triggerRight() {
+    alternateMode = false;
     if ($socket) $socket.emit('run', 'right');
     triggerLever('right');
   }
 
+  function triggerAlternating(startSide) {
+    alternateMode = true;
+    alternateNextSide = startSide;
+    triggerLever(startSide);
+  }
+
   function resetMarbles() {
-    marbles.reset();
+    marbles.reset($marbles.numbers.left, $marbles.numbers.right);
     triggerLock = false;
+    alternateMode = false;
     socket.sendBoard();
   }
 
@@ -188,14 +208,25 @@
     {/each}
   </div>
   <div id="levers">
-    <button on:click={triggerLeft}
-      disabled="{$board.marble || triggerLock || ($currentChallenge && $currentChallenge.trigger === 'right')}">Trigger Left</button>
-    <button on:click={triggerRight}
-      disabled="{$board.marble || triggerLock || ($currentChallenge && $currentChallenge.trigger === 'left')}">Trigger Right</button>
+    <div class="lever-column">
+      <button class="lever-blue" on:click={triggerLeft}
+        disabled="{$board.marble || triggerLock || ($currentChallenge && $currentChallenge.trigger === 'right')}">Trigger Left</button>
+      <button class="lever-blue" on:click={() => triggerAlternating('left')}
+        disabled="{$board.marble || triggerLock || ($currentChallenge && $currentChallenge.trigger === 'right')}">Trigger Alternating - Blue</button>
+    </div>
+    <div class="lever-column">
+      <button class="lever-red" on:click={triggerRight}
+        disabled="{$board.marble || triggerLock || ($currentChallenge && $currentChallenge.trigger === 'left')}">Trigger Right</button>
+      <button class="lever-red" on:click={() => triggerAlternating('right')}
+        disabled="{$board.marble || triggerLock || ($currentChallenge && $currentChallenge.trigger === 'left')}">Trigger Alternating - Red</button>
+    </div>
   </div>
   <div id="results-tray">
     <MarbleTray result={true} direction="right" marbles={$marbles.results}/>
-    <button on:click={resetMarbles} disabled="{!$board.marble && !$marbles.results.length}">Reset</button>
+    <button on:click={resetMarbles}>Reset</button>
+  </div>
+  <div id="results-sequence">
+    <MarbleTray result={true} direction="right" marbles={$marbles.results}/>
   </div>
 </div>
 
@@ -508,11 +539,38 @@
   #levers {
     display: flex;
     justify-content: space-around;
+    gap: 1rem;
+  }
+
+  .lever-column {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    align-items: center;
+  }
+
+  .lever-blue {
+    background-color: rgba(100, 160, 255, 0.25);
+  }
+
+  .lever-red {
+    background-color: rgba(255, 120, 120, 0.25);
   }
 
   #start-ramps {
     display: flex;
     justify-content: space-between;
+  }
+
+  #results-sequence {
+    position: fixed;
+    bottom: 1rem;
+    left: 50%;
+    transform: translateX(-50%);
+    width: min(70vw, 70vh);
+    pointer-events: none;
+    display: flex;
+    justify-content: center;
   }
 
   .marble-start {
