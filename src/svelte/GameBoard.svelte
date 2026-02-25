@@ -3,7 +3,7 @@
   import NumbersModal from './NumbersModal.svelte';
   import { tick, createEventDispatcher } from 'svelte';
   import { holding, currentChallenge, customMix } from '../store.js';
-  import { board } from '../board.js';
+  import Board, { board } from '../board.js';
   import { marbles } from '../marbles.js';
   import { socket } from '../socket.js';
   import { basePath } from '../store.js';
@@ -45,10 +45,145 @@
   let triggerLock = false;
   let alternateMode = false;
   let alternateNextSide = 'left';
+  let autoTriggerActive = false;
+  let showSolution = false;
+  let ghostBoard = null;
+  let lastChallengeId = null;
+  let hintDisabled = false;
+  export let escapedMarbles = [];
+  const AUTO_TRIGGER_DELAY_MS = 500;
+
+  $: challengeRestricts = Boolean(
+    $currentChallenge &&
+    ($currentChallenge.trigger === 'left' || $currentChallenge.trigger === 'right') &&
+    $currentChallenge.restrictTrigger !== false
+  );
+
+  $: if ($currentChallenge?.id !== lastChallengeId) {
+    showSolution = false;
+    lastChallengeId = $currentChallenge?.id ?? null;
+  }
+
+  $: if ($currentChallenge?.solutionCode) {
+    try {
+      ghostBoard = Board.create($currentChallenge.solutionCode);
+    } catch (err) {
+      console.log(err);
+      ghostBoard = null;
+    }
+  } else {
+    ghostBoard = null;
+  }
+
+  function toggleSolution() {
+    showSolution = !showSolution;
+  }
+
+  function ghostPartAt(x, y) {
+    if (!ghostBoard) return false;
+    return ghostBoard[y]?.[x] || false;
+  }
+
+  function isSamePart(a, b) {
+    if (!a && !b) return true;
+    if (!a || !b) return false;
+    return a.constructor === b.constructor &&
+      a.facing === b.facing &&
+      !!a.locked === !!b.locked;
+  }
+
+  function clonePart(part) {
+    if (!part) return false;
+    return new part.constructor(part.facing, part.locked);
+  }
+
+  $: hintDisabled = ghostBoard ? boardsMatchSolution() : true;
+
+  function boardsMatchSolution() {
+    if (!ghostBoard) return false;
+    for (let y = 0; y < $board.length; y++) {
+      for (let x = 0; x < $board[y].length; x++) {
+        if (!$board.isValid(x, y)) continue;
+        if (!isSamePart($board[y][x], ghostBoard[y][x])) return false;
+      }
+    }
+    return true;
+  }
+
+  function revealNextHint() {
+    if (!ghostBoard || hintDisabled) return;
+    for (let y = 0; y < $board.length; y++) {
+      for (let x = 0; x < $board[y].length; x++) {
+        if (!$board.isValid(x, y)) continue;
+        const solutionPart = ghostBoard[y][x];
+        if (solutionPart && !isSamePart($board[y][x], solutionPart)) {
+          $board[y][x] = clonePart(solutionPart);
+          $board = $board;
+          socket.sendBoard();
+          return;
+        }
+      }
+    }
+  }
+
+  function resolveAllowedSide(desiredSide) {
+    if (challengeRestricts) {
+      return $currentChallenge.trigger;
+    }
+    return desiredSide;
+  }
+
+  function pickAutoSide(preferredSide) {
+    if (challengeRestricts) {
+      return $marbles[$currentChallenge.trigger]?.length ? $currentChallenge.trigger : null;
+    }
+    return $marbles[preferredSide]?.length ? preferredSide : null;
+  }
+
+  function delay(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  function stopAutoTrigger() {
+    alternateMode = false;
+    autoTriggerActive = false;
+  }
+
+  function startAutoTrigger(startSide) {
+    alternateMode = true;
+    alternateNextSide = startSide;
+    if (autoTriggerActive) return;
+    autoTriggerActive = true;
+    runAutoTrigger();
+  }
+
+  async function runAutoTrigger() {
+    while (alternateMode) {
+      const allowedSide = pickAutoSide(alternateNextSide);
+      if (!allowedSide) {
+        stopAutoTrigger();
+        break;
+      }
+      if ($board.marble) {
+        await delay(AUTO_TRIGGER_DELAY_MS);
+        continue;
+      }
+      const result = await triggerLever(allowedSide);
+      if (!alternateMode) break;
+      if (result && result.side) {
+        alternateNextSide = result.side;
+      } else {
+        alternateNextSide = allowedSide;
+      }
+      await delay(AUTO_TRIGGER_DELAY_MS);
+    }
+  }
 
   function triggerLever(side='left') {
     if (!$board.marble && $marbles[side].length) {
-      $board.startRun($marbles[side].shift(), side, async () => {
+      const marble = $marbles[side].shift();
+      $marbles = $marbles;
+      return $board.startRun(marble, side, async () => {
         // Starts a marble run, waits for the marble to animate through current part before advancing it through the board.
         $board = $board;
         reset = true; // Applies reset class to clear transition based animations.
@@ -65,19 +200,16 @@
           // Adds the marble to the results and atempts to launch another one from the coresponding side.
           $marbles.results.push(result.marble);
           $board = $board;
-          if (alternateMode) {
-            alternateNextSide = result.side === 'left' ? 'right' : 'left';
-            if ($marbles[alternateNextSide].length) {
-              triggerLever(alternateNextSide);
-            } else {
-              alternateMode = false;
-            }
-          } else {
+          if (!alternateMode) {
             triggerLever(result.side);
           }
           $marbles = $marbles;
         }
+        return result;
       }).catch(() => {
+        if (marble) {
+          escapedMarbles = [...escapedMarbles, marble];
+        }
         // If anything goes wrong, reset the board.
         // Need to add better feedback for dropped marbles.
         if ($marbles.results.length === 0) {
@@ -87,9 +219,10 @@
           $board.marble = false;
           triggerLock = true;
         }
+        return false;
       });
-      $marbles = $marbles;
     }
+    return Promise.resolve(false);
   }
 
   function hasMarble(x, y) {
@@ -110,27 +243,27 @@
   }
 
   function triggerLeft() {
-    alternateMode = false;
+    stopAutoTrigger();
     if ($socket) $socket.emit('run', 'left');
     triggerLever('left');
   }
 
   function triggerRight() {
-    alternateMode = false;
+    stopAutoTrigger();
     if ($socket) $socket.emit('run', 'right');
     triggerLever('right');
   }
 
   function triggerAlternating(startSide) {
-    alternateMode = true;
-    alternateNextSide = startSide;
-    triggerLever(startSide);
+    stopAutoTrigger();
+    startAutoTrigger(startSide);
   }
 
-  function resetMarbles() {
+  export function resetMarbles() {
     marbles.reset($marbles.numbers.left, $marbles.numbers.right);
     triggerLock = false;
-    alternateMode = false;
+    stopAutoTrigger();
+    escapedMarbles = [];
     socket.sendBoard();
   }
 
@@ -185,6 +318,15 @@
             class:slot="{$board.hasSlot(x, y)}" class="position"
             on:mousedown="{e => grab(e, x, y)}"
             on:touchstart="{e => grab(e, x, y)}">
+          {#if showSolution && ghostBoard}
+            {#if !part && ghostPartAt(x, y)}
+              <div class="ghost-overlay" aria-hidden="true">
+                <div class:flipped={ghostPartAt(x, y).facing} class={ghostPartAt(x, y).name}>
+                  <img class="part ghost-part" src="{$basePath}images/{ghostPartAt(x, y).name}.svg" alt="">
+                </div>
+              </div>
+            {/if}
+          {/if}
           {#if part}
           <div class:flipped={part.facing} class={part.name} class:right="{marbleDirection(x, y)}" >
             <div class="wrapper" class:down="{isMoving(x, y)}"
@@ -207,26 +349,29 @@
     </div>
     {/each}
   </div>
+  <div id="finish-line" aria-hidden="true"></div>
   <div id="levers">
     <div class="lever-column">
       <button class="lever-blue" on:click={triggerLeft}
-        disabled="{$board.marble || triggerLock || ($currentChallenge && $currentChallenge.trigger === 'right')}">Trigger Left</button>
+        disabled="{$board.marble || triggerLock || (challengeRestricts && $currentChallenge.trigger === 'right')}">Trigger Left</button>
       <button class="lever-blue" on:click={() => triggerAlternating('left')}
-        disabled="{$board.marble || triggerLock || ($currentChallenge && $currentChallenge.trigger === 'right')}">Trigger Alternating - Blue</button>
+        disabled="{$board.marble || triggerLock || (challengeRestricts && $currentChallenge.trigger === 'right')}">Trigger Alternating - Blue</button>
     </div>
     <div class="lever-column">
       <button class="lever-red" on:click={triggerRight}
-        disabled="{$board.marble || triggerLock || ($currentChallenge && $currentChallenge.trigger === 'left')}">Trigger Right</button>
+        disabled="{$board.marble || triggerLock || (challengeRestricts && $currentChallenge.trigger === 'left')}">Trigger Right</button>
       <button class="lever-red" on:click={() => triggerAlternating('right')}
-        disabled="{$board.marble || triggerLock || ($currentChallenge && $currentChallenge.trigger === 'left')}">Trigger Alternating - Red</button>
+        disabled="{$board.marble || triggerLock || (challengeRestricts && $currentChallenge.trigger === 'left')}">Trigger Alternating - Red</button>
     </div>
   </div>
-  <div id="results-tray">
-    <MarbleTray result={true} direction="right" marbles={$marbles.results}/>
-    <button on:click={resetMarbles}>Reset</button>
-  </div>
-  <div id="results-sequence">
-    <MarbleTray result={true} direction="right" marbles={$marbles.results}/>
+  <div id="board-actions">
+    {#if $currentChallenge?.solutionCode}
+      <button class="solution-button" on:click={toggleSolution}>
+        {showSolution ? 'Hide Solution' : 'Show Solution'}
+      </button>
+      <button class="hint-button" on:click={revealNextHint} disabled={hintDisabled}>Hint</button>
+    {/if}
+    <button class="reset-button" on:click={resetMarbles}>Reset</button>
   </div>
 </div>
 
@@ -281,6 +426,7 @@
     width: 6vh;
     height: 6vh;
     overflow: visible;
+    position: relative;
   }
   @media (max-aspect-ratio: 7/9) {
     .row {
@@ -530,16 +676,50 @@
   }
   
 
-  #results-tray {
-    display: flex;
-    justify-content: right;
-    align-items: center;
-  }
-
   #levers {
     display: flex;
     justify-content: space-around;
     gap: 1rem;
+  }
+
+  #board-actions {
+    display: flex;
+    justify-content: flex-start;
+    padding: 0.25rem 0.5rem 0.5rem;
+  }
+
+  .solution-button {
+    margin-right: 0.5rem;
+  }
+
+  .hint-button {
+    margin-right: 0.5rem;
+  }
+
+  .reset-button {
+    margin-left: auto;
+  }
+
+  .ghost-overlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .ghost-part {
+    opacity: 0.5;
+  }
+
+  #finish-line {
+    margin: 0.2vh auto 0.6vh;
+    width: 66vh;
+    border-top: 2px dashed #c8c8c8;
+    opacity: 0.7;
+    pointer-events: none;
   }
 
   .lever-column {
@@ -560,17 +740,6 @@
   #start-ramps {
     display: flex;
     justify-content: space-between;
-  }
-
-  #results-sequence {
-    position: fixed;
-    bottom: 1rem;
-    left: 50%;
-    transform: translateX(-50%);
-    width: min(70vw, 70vh);
-    pointer-events: none;
-    display: flex;
-    justify-content: center;
   }
 
   .marble-start {
@@ -628,6 +797,13 @@
     button {
       font-size: 0.8em;
       padding: 0.1em;
+    }
+  }
+
+  @media (max-aspect-ratio: 7/9) {
+    #finish-line {
+      width: 88vw;
+      margin: 0.2vw auto 0.6vw;
     }
   }
 </style>

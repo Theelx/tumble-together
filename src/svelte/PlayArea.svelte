@@ -1,9 +1,10 @@
 <script>
   import GameBoard from './GameBoard.svelte';
+  import MarbleTray from './MarbleTray.svelte';
   import PartsTray from  './PartsTray.svelte';
   import Hand from './Hand.svelte';
 
-  import { holding } from '../store.js';
+  import { holding, currentChallenge, basePath } from '../store.js';
   import { board } from '../board.js';
   import { marbles } from '../marbles.js';
   import { parts } from '../parts.js';
@@ -12,6 +13,8 @@
   let mousePosition = {};
   let lastGrab = {x: false, y: false, timeout: false};
   let boardElement;
+  let gameBoard;
+  let escapedMarbles = [];
 
 
   function getBoardPosition(pageX, pageY) {
@@ -86,8 +89,39 @@
     on:mouseleave="{e => drop(e, true)}"
     on:touchmove={touchMove}
     on:touchend={drop}>
-  <GameBoard bind:boardElement bind:lastGrab on:touch="{e => touchMove(e.detail)}"/>
-  <PartsTray on:touch="{e => touchMove(e.detail, true)}"/>
+  <GameBoard bind:this={gameBoard} bind:escapedMarbles bind:boardElement bind:lastGrab
+    on:touch="{e => touchMove(e.detail)}"/>
+  <div id="side-panel">
+    <div class="tray-row">
+      <div class="tray-container" id="results-tray">
+        <div class="tray-label">Results</div>
+        <div class="tray-body">
+          <MarbleTray result={true} direction="right" marbles={$marbles.results} slots={16}/>
+        </div>
+      </div>
+      <div class="tray-container" id="goal-tray">
+        <div class="tray-label">Goal</div>
+        <div class="tray-body">
+          {#if $currentChallenge?.output}
+            <div class="goal-row">
+              {#each $currentChallenge.output as marble, i (i)}
+                <img class="goal-marble" src="{$basePath}images/marble{marble === 'b' ? 'blue' : 'red'}.svg" alt="Goal Marble">
+              {/each}
+            </div>
+          {:else}
+            <div class="goal-row empty"></div>
+          {/if}
+        </div>
+      </div>
+    </div>
+    <div class="tray-container" id="escaped-tray">
+      <div class="tray-label">Escaped</div>
+      <div class="tray-body">
+        <MarbleTray result={true} direction="right" marbles={escapedMarbles} slots={16}/>
+      </div>
+    </div>
+    <PartsTray on:touch="{e => touchMove(e.detail, true)}"/>
+  </div>
 </div>
 <Hand {mousePosition}/>
 
@@ -96,13 +130,87 @@
     display: flex;
     flex-direction: row;
     justify-content: center;
-    align-items: center;
+    align-items: flex-start;
     width: 92%;
     margin: auto;
+  }
+  #side-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    margin-left: 0.5rem;
+    align-items: stretch;
+  }
+  .tray-row {
+    display: flex;
+    gap: 0.5rem;
+    align-items: stretch;
+  }
+  .tray-container {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+    min-height: 2vh;
+    padding: 0.25rem 0.5rem;
+    border: 1px dashed rgba(0, 0, 0, 0.2);
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.75);
+  }
+  .tray-label {
+    font-size: 0.9rem;
+    font-weight: 600;
+  }
+  .tray-body {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    min-height: 1.6vh;
+    width: 28vh;
+  }
+  .goal-row {
+    display: flex;
+    flex-direction: row;
+    justify-content: flex-start;
+    gap: 0.1rem;
+    width: 100%;
+  }
+  .goal-row.empty {
+    min-height: 1.6vh;
+  }
+  .goal-marble {
+    width: 1.44vh;
+    height: 1.44vh;
+  }
+  @media (max-aspect-ratio: 7/9) {
+    .goal-marble {
+      width: 1.92vw;
+      height: 1.92vw;
+    }
+  }
+  :global(#side-panel #marble-tray) {
+    width: 100%;
   }
   @media (max-aspect-ratio: 7/9) {
     #play-area {
       flex-direction: column;
+      align-items: center;
+    }
+    #side-panel {
+      margin-left: 0;
+      width: 100%;
+      align-items: center;
+    }
+    .tray-row {
+      flex-direction: column;
+      align-items: center;
+      width: 100%;
+    }
+    .tray-container {
+      width: min(90vw, 70vh);
+    }
+    .tray-body {
+      width: min(90vw, 70vh);
     }
   }
   .grabbed {

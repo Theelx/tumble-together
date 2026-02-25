@@ -3,6 +3,7 @@ export default [
     id: 1,
     name: 'Gravity',
     code: '-C1GD0FC1GKC1GKC1GKC1GKK_IA0E2A4A6A7A8A',
+    solutionCode: 'C1-GD0-FC1-GD0FC1-GD0FC1-GD0FC1-GD0FK_IA0A2A6A7A4A8A',
     trigger: 'left',
     output: 'bbbbbbbb',
     objective: 'Make all of the blue balls (and only the blue balls) reach the end.'
@@ -11,6 +12,7 @@ export default [
     id: 2,
     name: 'Re-entry',
     code: '-C1GD1FE1EF1DG1CH1BKKKKK_II0F2A6A7A4A8A',
+    solutionCode: 'C1-GD1-FE1-EF1-DG1-CH1-BI0AH0BG0CF0DE0E_II0A2A6A7A4A8A',
     trigger: 'left',
     output: 'bbbbbbbb',
     objective: 'Make all of the blue balls (and only the blue balls) reach the end.'
@@ -19,6 +21,8 @@ export default [
     id: 3,
     name: 'Ignition',
     code: '-C1C0CKKKKKI0AH1BI0AH1BK_II0G2A6A7A4A8A',
+    solutionCode: 'C1-C0-CD1A0DE1EF1DG1CH1BI0-AH1-BI0-AH1-BK_II0A2A6A7A4A8A',
+    restrictTrigger: false,
     trigger: 'left',
     output: 'rrrrrrrrb',
     objective: 'Release one blue ball and then all of the red balls.'
@@ -156,7 +160,7 @@ export default [
     name: 'Quantum Number',
     code: '-C3GB1A1FC3GB1A1FC3GB1A1FC3GB1A1FC1GD1FK_II0F2A6A7A4A8A',
     trigger: 'left',
-    objective: ' Use register A to count the number of blue balls. (Use 15 or fewer balls.) See the puzzle book for further details. See the puzzle book for further details.'
+    objective: ' Use register A to count the number of blue balls. (Use 15 or fewer balls.) See the puzzle book for further details.'
   },
   {
     id: 22,
