@@ -101,6 +101,7 @@ export default [
     id: 11,
     name: 'Selectivity',
     code: '-KKE2EKKKA3A3A3A3A3AKKKK_CA0P2A6A7A4A8A',
+    solutionCode: 'C1GD1FE2-ED0A1DC0C1CB1E1BA3-A2-A3-A3-A2-AD0E0C0E0AB0E0BK_CA0B2A6A7A4A8A',
     restrictTrigger: false,
     trigger: 'left',
     objective: 'Flip bits 2 and 5 to the right. See the puzzle book for further details.'
@@ -109,6 +110,7 @@ export default [
     id: 12,
     name: 'Duality',
     code: '-C1GD1FE2EKKKG0CF0DE7EKK_II0D2A6A7A4A8A',
+    solutionCode: 'C1-GD1-FE2-EF1DG1CH0BG0-CF0-DE7-EKK_II0A2A6A7A4A8A',
     restrictTrigger: false,
     trigger: 'left',
     objective: 'Intercept a blue ball.'
@@ -117,6 +119,7 @@ export default [
     id: 13,
     name: 'Duality - Part 2',
     code: '-C1GD1FE2EF1DG1CH0BG0CF0DE7EKK_I0M2A6A7A4A8A',
+    solutionCode: 'C1-C0CD1-A0DE2-ED0A1-DC0C1-CB0E0-BA1E0-CB1C0-DC1A7-ED1FE1E_II0C2A6A7A4A8A',
     restrictTrigger: false,
     trigger: 'left',
     objective: 'Intercept a red ball.'
