@@ -356,13 +356,13 @@
       <button class="lever-blue" on:click={triggerLeft}
         disabled="{$board.marble || triggerLock || (challengeRestricts && $currentChallenge.trigger === 'right')}">Trigger Left</button>
       <button class="lever-blue" on:click={() => triggerAlternating('left')}
-        disabled="{$board.marble || triggerLock || (challengeRestricts && $currentChallenge.trigger === 'right')}">Trigger Alternating - Blue</button>
+        disabled="{$board.marble || triggerLock || ($currentChallenge && $currentChallenge.trigger === 'right')}">Trigger Alternating - Blue</button>
     </div>
     <div class="lever-column">
       <button class="lever-red" on:click={triggerRight}
         disabled="{$board.marble || triggerLock || (challengeRestricts && $currentChallenge.trigger === 'left')}">Trigger Right</button>
       <button class="lever-red" on:click={() => triggerAlternating('right')}
-        disabled="{$board.marble || triggerLock || (challengeRestricts && $currentChallenge.trigger === 'left')}">Trigger Alternating - Red</button>
+        disabled="{$board.marble || triggerLock || ($currentChallenge && $currentChallenge.trigger === 'left')}">Trigger Alternating - Red</button>
     </div>
   </div>
   <div id="board-actions">
