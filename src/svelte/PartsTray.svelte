@@ -44,11 +44,28 @@
     part.count = number;
     $parts = $parts;
   }
+
+  function partTooltip(name) {
+    switch (name) {
+      case 'ramp':
+        return 'Wire';
+      case 'bit':
+      case 'gearbit':
+        return 'Transistor/Bit';
+      case 'crossover':
+        return 'Crossover';
+      case 'interceptor':
+        return 'Shutoff Switch';
+      default:
+        return '';
+    }
+  }
 </script>
 
 <div id="parts-tray">
   {#each $parts as part}
   <div class="part" class:unavailable={!part.count}
+      title={partTooltip(part.name)}
       on:mousedown="{e => grab(e, part)}"
       on:touchstart="{e => grab(e, part)}"
       on:mouseup="{e => edit(e, part)}"

@@ -99,6 +99,22 @@
     return new part.constructor(part.facing, part.locked);
   }
 
+  function partTooltip(name) {
+    switch (name) {
+      case 'ramp':
+        return 'Wire';
+      case 'bit':
+      case 'gearbit':
+        return 'Transistor/Bit';
+      case 'crossover':
+        return 'Crossover';
+      case 'interceptor':
+        return 'Shutoff Switch';
+      default:
+        return '';
+    }
+  }
+
   $: hintDisabled = ghostBoard ? boardsMatchSolution() : true;
 
   function boardsMatchSolution() {
@@ -323,7 +339,7 @@
             {#if !part && ghostPartAt(x, y) && (showSolution || hintedPositions.has(`${x},${y}`))}
               <div class="ghost-overlay" aria-hidden="true">
                 <div class:flipped={ghostPartAt(x, y).facing} class={ghostPartAt(x, y).name}>
-                  <img class="part ghost-part" src="{$basePath}images/{ghostPartAt(x, y).name}.svg" alt="">
+                  <img class="part ghost-part" src="{$basePath}images/{ghostPartAt(x, y).name}.svg" alt="" title={partTooltip(ghostPartAt(x, y).name)}>
                 </div>
               </div>
             {/if}
@@ -332,7 +348,7 @@
           <div class:flipped={part.facing} class={part.name} class:right="{marbleDirection(x, y)}" >
             <div class="wrapper" class:down="{isMoving(x, y)}"
                 class:reset>
-              <img class="part" class:locked={part.locked} src="{$basePath}images/{part.name}.svg" alt={part.name}>
+              <img class="part" class:locked={part.locked} src="{$basePath}images/{part.name}.svg" alt={part.name} title={partTooltip(part.name)}>
               {#if hasMarble(x, y)}
                 <img bind:this={marbleElement} class="marble" src="{$basePath}images/marble{$board.marble.color}.svg" alt="">
               {/if}
