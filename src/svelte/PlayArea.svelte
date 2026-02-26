@@ -15,6 +15,48 @@
   let boardElement;
   let gameBoard;
   let escapedMarbles = [];
+  let winActive = false;
+  let lastWin = false;
+  let winTimer;
+  const confettiCount = 24;
+
+  const resultsDisplayReversed = true;
+  const goalDisplayReversed = false;
+
+  function normalizeSequence(sequence, reversed) {
+    return reversed ? [...sequence].reverse() : sequence;
+  }
+
+  function isWin() {
+    if (!$currentChallenge?.output) return false;
+    if ($marbles.results.length !== $currentChallenge.output.length) return false;
+    const resultSeq = normalizeSequence($marbles.results.map(m => m.color), resultsDisplayReversed);
+    const goalSeq = normalizeSequence([...$currentChallenge.output], goalDisplayReversed);
+    for (let i = 0; i < goalSeq.length; i++) {
+      const expected = goalSeq[i] === 'b' ? 'blue' : 'red';
+      if (resultSeq[i] !== expected) return false;
+    }
+    return true;
+  }
+
+  $: {
+    const nowWin = isWin();
+    if ($currentChallenge?.output) {
+      console.log('win-check', {
+        nowWin,
+        results: $marbles.results.map(m => m.color),
+        goal: $currentChallenge.output,
+        resultsDisplayReversed,
+        goalDisplayReversed
+      });
+    }
+    if (nowWin && !lastWin) {
+      winActive = true;
+      if (winTimer) clearTimeout(winTimer);
+      winTimer = setTimeout(() => { winActive = false; }, 4000);
+    }
+    lastWin = nowWin;
+  }
 
 
   function getBoardPosition(pageX, pageY) {
@@ -89,6 +131,16 @@
     on:mouseleave="{e => drop(e, true)}"
     on:touchmove={touchMove}
     on:touchend={drop}>
+  {#if winActive}
+    <div class="win-overlay" aria-live="polite">
+      <div class="win-banner">You Win</div>
+      <div class="confetti" style="--count:{confettiCount}">
+        {#each Array.from({ length: confettiCount }) as _, i (i)}
+          <span class="confetti-piece" style="--i:{i}"></span>
+        {/each}
+      </div>
+    </div>
+  {/if}
   <GameBoard bind:this={gameBoard} bind:escapedMarbles bind:boardElement bind:lastGrab
     on:touch="{e => touchMove(e.detail)}"/>
   <div id="side-panel">
@@ -133,6 +185,7 @@
     align-items: flex-start;
     width: 92%;
     margin: auto;
+    position: relative;
   }
   #side-panel {
     display: flex;
@@ -181,6 +234,58 @@
   .goal-marble {
     width: 1.44vh;
     height: 1.44vh;
+  }
+  .win-overlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+    z-index: 10;
+  }
+  .win-banner {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 2rem;
+    padding: 0.4rem 0.9rem;
+    border-radius: 0.5rem;
+    color: #113355;
+    background: rgba(240, 248, 255, 0.9);
+    border: 2px solid rgba(30, 90, 160, 0.35);
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.12);
+    animation: win-pop 0.3s ease-out;
+  }
+  .confetti {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+  }
+  .confetti-piece {
+    position: absolute;
+    top: -10%;
+    left: calc((var(--i) + 1) * (100% / (var(--count) + 1)));
+    width: 0.5rem;
+    height: 0.8rem;
+    opacity: 0.9;
+    border-radius: 0.1rem;
+    background: #5aa2ff;
+    animation: confetti-fall 3.2s ease-out forwards;
+    animation-delay: calc(var(--i) * 0.035s);
+    transform: rotate(calc(var(--i) * 23deg));
+  }
+  .confetti-piece:nth-child(3n) { background: #ff7b7b; }
+  .confetti-piece:nth-child(3n+1) { background: #ffd166; }
+  .confetti-piece:nth-child(3n+2) { background: #7bdff6; }
+  @keyframes win-pop {
+    0% { transform: scale(0.9); opacity: 0; }
+    100% { transform: scale(1); opacity: 1; }
+  }
+  @keyframes confetti-fall {
+    0% { transform: translateY(0) rotate(0deg); opacity: 0.9; }
+    45% { transform: translateY(120vh) rotate(360deg); opacity: 0; }
+    50% { transform: translateY(0) rotate(0deg); opacity: 0.9; }
+    95% { transform: translateY(120vh) rotate(360deg); opacity: 0; }
+    100% { transform: translateY(120vh) rotate(360deg); opacity: 0; }
   }
   @media (max-aspect-ratio: 7/9) {
     .goal-marble {

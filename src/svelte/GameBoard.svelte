@@ -50,6 +50,7 @@
   let ghostBoard = null;
   let lastChallengeId = null;
   let hintDisabled = false;
+  let hintedPositions = new Set();
   export let escapedMarbles = [];
   const AUTO_TRIGGER_DELAY_MS = 500;
 
@@ -61,6 +62,7 @@
 
   $: if ($currentChallenge?.id !== lastChallengeId) {
     showSolution = false;
+    hintedPositions = new Set();
     lastChallengeId = $currentChallenge?.id ?? null;
   }
 
@@ -116,10 +118,9 @@
       for (let x = 0; x < $board[y].length; x++) {
         if (!$board.isValid(x, y)) continue;
         const solutionPart = ghostBoard[y][x];
-        if (solutionPart && !isSamePart($board[y][x], solutionPart)) {
-          $board[y][x] = clonePart(solutionPart);
-          $board = $board;
-          socket.sendBoard();
+        const key = `${x},${y}`;
+        if (solutionPart && !isSamePart($board[y][x], solutionPart) && !hintedPositions.has(key)) {
+          hintedPositions = new Set([...hintedPositions, key]);
           return;
         }
       }
@@ -318,8 +319,8 @@
             class:slot="{$board.hasSlot(x, y)}" class="position"
             on:mousedown="{e => grab(e, x, y)}"
             on:touchstart="{e => grab(e, x, y)}">
-          {#if showSolution && ghostBoard}
-            {#if !part && ghostPartAt(x, y)}
+          {#if ghostBoard}
+            {#if !part && ghostPartAt(x, y) && (showSolution || hintedPositions.has(`${x},${y}`))}
               <div class="ghost-overlay" aria-hidden="true">
                 <div class:flipped={ghostPartAt(x, y).facing} class={ghostPartAt(x, y).name}>
                   <img class="part ghost-part" src="{$basePath}images/{ghostPartAt(x, y).name}.svg" alt="">
